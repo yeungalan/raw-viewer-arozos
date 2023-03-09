@@ -1,0 +1,23 @@
+/*
+	Photo Module Register Script
+*/
+
+//Setup the module information
+var moduleLaunchInfo = {
+    Name: "RAW Viewer",
+	Desc: "RAW photo viewer",
+	Group: "Media",
+	IconPath: "RAW Viewer/img/module_icon.png",
+	Version: "0.0.1",
+	StartDir: "RAW Viewer/index.html",
+	SupportFW: true,
+	LaunchFWDir: "RAW Viewer/index.html",
+	SupportEmb: true,
+	LaunchEmb: "RAW Viewer/embedded.html",
+	InitFWSize: [900, 550],
+	InitEmbSize: [900, 500],
+	SupportedExt: [".cr2", ".arw", ".dng"]
+}
+
+//Register the module
+registerModule(JSON.stringify(moduleLaunchInfo));
