@@ -2,6 +2,7 @@
 
 This is a Basic RAW Image viewer that you can read your RAW image from arozos
 
+![image](https://user-images.githubusercontent.com/12872405/225529269-d0257140-3d2f-4099-8526-13e3da6c593e.png)
 
 ### Requirement
 
