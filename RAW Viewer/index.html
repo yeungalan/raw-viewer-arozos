@@ -20,15 +20,16 @@
         <h3 class="ui header">
             <i class="photo icon"></i>
             <div class="content">
-                RAW Photo thumbnail generation tool
+                RAW thumbnail generation tool
               <div class="sub header">You may use this tool to generate RAW's thumbnail (beware of bandwidth cost!)</div>
             </div>
         </h3>
         <p>RAW file thumbnail rendering path:</p>
-        <span id="flist"></span>
+        <span id="flist">-None selected-</span>
         <div class="ui divider"></div>
         <button class="ui primary button" onclick="openFolderSelector();">Open Folder</button>
         <button class="ui primary button" onclick="render();">Start Render</button>
+        <button class="ui primary button" id="btnFinish" onclick="location.reload();" disabled="disabled">Restart</button>
         <div class="ui divider"></div>
         <p>Current progress:&nbsp;<span id="progressLabel"> Not started</span></p>
         <div class="ui indicating progress" id="progressRender">
@@ -57,10 +58,21 @@
             }
 
             function render() {
+                if (path == ""){
+                    alert("No folder selected");
+                    return;
+                }
                 $(".button").attr("disabled", "disabled");
 
                 ao_module_agirun("RAW Viewer/agi/listFolder.js", {path: path}, function(data){
-                    console.log(data);
+                    //console.log(data);
+                    if(data.length == 0) {
+                        $('#progressRender').progress({total: 1});
+                        $('#progressRender').progress('increment');
+                        $("#btnFinish").removeAttr('disabled');
+                        $("#progressLabel").text("Nothing to render, finished.");
+                    return;
+                    }
                     imageToRender = data;
                     i = 0;
                     $('#progressRender').progress({total: data.length});
@@ -69,10 +81,13 @@
             }
 
             function nextFile() {
-                $("#progressLabel").text(i + " / " + imageToRender.length);
                 $('#progressRender').progress('increment');
                 if(i >= imageToRender.length) {
+                    $("#btnFinish").removeAttr('disabled');
+                    $("#progressLabel").text(i + " / " + imageToRender.length + ", Finished.");
                     return;
+                }else{
+                    $("#progressLabel").text(i + " / " + imageToRender.length + ", Rendering: " + imageToRender[i]);
                 }
                 loadImage(path, imageToRender[i]);
                 i++;
@@ -81,19 +96,16 @@
             // path, filename + full path
             function loadImage(pathonly, filepath){
                 $("#img").hide();
-                /*
-                $("#img").attr("src", '../media?file=' + encodeURIComponent(filepath))
-                */
                 var oReq = new XMLHttpRequest();
                 oReq.open("GET", '../media?file=' + encodeURIComponent(filepath), true);
                 oReq.responseType = "arraybuffer";
 
                 oReq.onload = function(oEvent) {
-                var arrayBuffer = oReq.response;
+                    var arrayBuffer = oReq.response;
 
-                // if you want to access the bytes:
-                var buf = new Uint8Array(arrayBuffer);
-                var thumbnail = dcraw(buf, {  verbose: true, extractThumbnail: true , identify: true});
+                    // if you want to access the bytes:
+                    var buf = new Uint8Array(arrayBuffer);
+                    var thumbnail = dcraw(buf, {  verbose: true, extractThumbnail: true , identify: true});
                     // Create thumbnail
                     var blob = new Blob([thumbnail], { type: "image/jpeg" });
                     var urlCreator = window.URL || window.webkitURL;
@@ -101,13 +113,11 @@
                     var img = document.querySelector("#img");
                     img.src = imageUrl;
 
-                    var metadata = dcraw(buf, { verbose: true, identify: true }).split('\n').filter(String);
-                    console.log(metadata);
+                    //var metadata = dcraw(buf, { verbose: true, identify: true }).split('\n').filter(String);
+                    //console.log(metadata);
                     crop(pathonly, filepath, imageUrl, 1);
-                    //upload(pathonly, filepath, blob);
                 };
                 oReq.send();
-                currentImageURL = '../media?file=' + encodeURIComponent(filepath);
             }
 
 			function upload(pathonly, pfilepath, currentViewingPhotoBlob){
@@ -123,66 +133,70 @@
 					if (data.error !== undefined){
 						alert(data.error);
 					}else{
-						$("#uploadSuccIcon").slideDown("fast").delay(3000).slideUp("fast");
                         nextFile();
 					}
 				});
 			}
 
-            /**
- * @param {string} url - The source image
- * @param {number} aspectRatio - The aspect ratio
- * @return {Promise<HTMLCanvasElement>} A Promise that resolves with the resulting image as a canvas element
- */
-function crop(pathonly, filepath, url, aspectRatio) {
-    // we return a Promise that gets resolved with our canvas element
-    return new Promise((resolve) => {
-        // this image will hold our source image data
-        const inputImage = new Image();
 
-        // we want to wait for our image to load
-        inputImage.onload = () => {
-            // let's store the width and height of our image
-            const inputWidth = inputImage.naturalWidth;
-            const inputHeight = inputImage.naturalHeight;
+            function crop(pathonly, filepath, url, aspectRatio) {
+                return new Promise((resolve) => {
+                    const inputImage = new Image();
 
-            // get the aspect ratio of the input image
-            const inputImageAspectRatio = inputWidth / inputHeight;
+                    inputImage.onload = () => {
+                        const inputWidth = inputImage.naturalWidth;
+                        const inputHeight = inputImage.naturalHeight;
+                        const inputImageAspectRatio = inputWidth / inputHeight;
+                        let outputWidth = inputWidth;
+                        let outputHeight = inputHeight;
+                        if (inputImageAspectRatio > aspectRatio) {
+                            outputWidth = inputHeight * aspectRatio;
+                        } else if (inputImageAspectRatio < aspectRatio) {
+                            outputHeight = inputWidth / aspectRatio;
+                        }
+                        const outputX = (outputWidth - inputWidth) * 0.5;
+                        const outputY = (outputHeight - inputHeight) * 0.5;
 
-            // if it's bigger than our target aspect ratio
-            let outputWidth = inputWidth;
-            let outputHeight = inputHeight;
-            if (inputImageAspectRatio > aspectRatio) {
-                outputWidth = inputHeight * aspectRatio;
-            } else if (inputImageAspectRatio < aspectRatio) {
-                outputHeight = inputWidth / aspectRatio;
+                        const outputImage = document.createElement('canvas');
+                        outputImage.width = outputWidth;
+                        outputImage.height = outputHeight;
+
+                        const ctx = outputImage.getContext('2d');
+                        //console.log(outputX, outputY);
+                        ctx.drawImage(inputImage, outputX, outputY);
+                        resolve(outputImage);
+                        outputImage.toBlob((blob) => {
+                            var urlCreator = window.URL || window.webkitURL;
+                            resize(pathonly, filepath, urlCreator.createObjectURL(blob));
+                            //upload(pathonly, filepath, blob);
+                        }, "image/jpeg", 1);
+                    };
+                    inputImage.src = url;
+                });
             }
 
-            // calculate the position to draw the image at
-            const outputX = (outputWidth - inputWidth) * 0.5;
-            const outputY = (outputHeight - inputHeight) * 0.5;
+            function resize(pathonly, filepath, url) {
+                return new Promise((resolve) => {
+                    const inputImage = new Image();
+                    inputImage.onload = () => {
+                        const outputImage = document.createElement('canvas');
 
-            // create a canvas that will present the output image
-            const outputImage = document.createElement('canvas');
+                        outputImage.width = 480;
+                        outputImage.height = 480;
 
-            // set it to the same size as the image
-            outputImage.width = outputWidth;
-            outputImage.height = outputHeight;
-
-            // draw our image at position 0, 0 on the canvas
-            const ctx = outputImage.getContext('2d');
-            ctx.drawImage(inputImage, outputX, outputY);
-            resolve(outputImage);
-            outputImage.toBlob((blob) => {
-                //console.log(URL.createObjectURL(blob));
-                upload(pathonly, filepath, blob);
-            });
-        };
-
-        // start loading our image
-        inputImage.src = url;
-    });
-}
+                        const ctx = outputImage.getContext('2d');
+                        console.log(inputImage.naturalWidth, inputImage.naturalHeight);
+                        ctx.drawImage(inputImage, 0, 0, inputImage.naturalWidth, inputImage.naturalHeight, 0, 0, 480, 480);
+                        resolve(outputImage);
+                        outputImage.toBlob((blob) => {
+                            upload(pathonly, filepath, blob);
+                        }, "image/jpeg", 0.3);
+                    };
+                    inputImage.src = url;
+                });
+            }
+            
+            
 </script>
 
 </html>

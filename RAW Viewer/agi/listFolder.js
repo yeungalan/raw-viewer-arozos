@@ -14,10 +14,17 @@ function listNearby(){
     //Get nearby files and filter out the one that is web supported photo format
     var nearbyFiles = filelib.aglob(dirpath + "/*", "user")
     for (var i = 0; i < nearbyFiles.length; i++){
+        var fileStopPos = nearbyFiles[i].lastIndexOf("/")+1;
+        var filepath = nearbyFiles[i].substring(0, fileStopPos);
+        var filename = nearbyFiles[i].substring(fileStopPos, nearbyFiles[i].length);
+        console.log(filepath, filename);
         var ext = nearbyFiles[i].split(".").pop();
         ext = ext.toLowerCase();
-        if (ext == "cr2" || ext == "arw" || ext == "dng"){
-            result.push(nearbyFiles[i]);
+        // FILE EXISTS + FILE THUMBNAIL DOES NOT EXIST
+        if(filelib.fileExists(nearbyFiles[i]) && !filelib.fileExists(filepath + "/.metadata/.cache/" + filename + ".jpg")) {
+            if (ext == "cr2" || ext == "arw" || ext == "dng"){
+                result.push(nearbyFiles[i]);
+            }
         }
     }
 
